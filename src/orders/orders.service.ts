@@ -6,11 +6,12 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ChangeOrderStatusDto, CreateOrderDto } from './dto';
-import { PrismaClient } from '@prisma/client';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { OrderPaginationDto } from './dto/order-pagination.dto';
 import { NATS_SERVICE } from 'src/config';
 import { firstValueFrom } from 'rxjs';
+import { PrismaClient } from '@prisma/client';
+import { OrderWithProducts } from './interfaces';
 
 @Injectable()
 export class OrdersService extends PrismaClient implements OnModuleInit {
@@ -155,5 +156,21 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
       where: { id },
       data: { status },
     });
+  }
+
+  async createPaymentSession(order: OrderWithProducts) {
+    const paymentSession = await firstValueFrom(
+      this.client.send('create.payment.session', {
+        orderId: order.createdAt,
+        currency: 'usd',
+        items: order.OrderItem.map((item) => ({
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+      }),
+    );
+
+    return paymentSession;
   }
 }
